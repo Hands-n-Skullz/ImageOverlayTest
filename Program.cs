@@ -1,7 +1,5 @@
-﻿using ImageOverlayTest.Model;
-using System;
+﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
@@ -10,62 +8,69 @@ namespace ImageOverlayTest
 {
     class Program
     {
-        public bool IsDebug { get; set; }
-
         static void Main(string[] args)
         {
-            List<ImageSet> imageSetList = new List<ImageSet>();
+            List<List<string>> imageListByFolder = new List<List<string>>();
 
             //Get Root Directory
             string root = Directory.GetCurrentDirectory();
+            
+            //For Debug
+            //root = @"C:\NFT";
 
             //Get Directories
             string[] dir = Directory.GetDirectories(root);
 
-            Console.WriteLine("Directory List:");
-            foreach (string s in dir)
+            //Delete and Create Output Directory
+            try
             {
-                Console.WriteLine(s);
+                Directory.Delete(root + @"\_output", true);
             }
-            Console.WriteLine("----------");
+            catch(Exception e)
+            {
+                Console.WriteLine("Warning: " + e.Message);
+                Console.WriteLine(@"Assuming '_output' folder does not exist.");
+            }
+
+            Directory.CreateDirectory(root + @"\_output");
 
             //Load Images on directories and add to list
-            Console.WriteLine("Loading images per directory:");
+            int maxCombo = 0;
             foreach (string d in dir)
             {
                 IEnumerable<string> imagePathList = Directory.EnumerateFiles(d);
-                List<ImageObject> l = new List<ImageObject>();
-                int index = 0;
 
-                Console.WriteLine("Directory: " + d);
-                foreach (var imagePath in imagePathList)
+                if(imagePathList.ToList().Count() > 0)
                 {
-                    Console.WriteLine("Image " + index + ": " + imagePath);
-                    l.Add(new ImageObject()
+                    imageListByFolder.Add(imagePathList.ToList());
+
+                    if(maxCombo == 0)
                     {
-                        Index = index,
-                        Image = Image.FromFile(imagePath)
-                    });
-                    index++;
+                        maxCombo = imagePathList.ToList().Count();
+                    }
+                    else
+                    {
+                        maxCombo *= imagePathList.ToList().Count();
+                    }
+                }
+            }
+
+            //Generate Combinations
+            var comboList = ImageCombiner.GetAllPossibleCombos(imageListByFolder).ToList();
+
+            //Generate Images
+            int index = 0;
+            foreach(var list in comboList)
+            {
+                Console.WriteLine("Combo " + index + " of " + maxCombo);
+                index++;
+                foreach(string s in list)
+                {
+                    Console.WriteLine(s);
                 }
 
-                imageSetList.Add(new ImageSet()
-                {
-                    Directory = d,
-                    ImageList = l
-                });
-                Console.WriteLine("-");
-            }
-            Console.WriteLine("----------");
-            imageSetList = imageSetList.OrderBy(i => i.Directory).ToList();
-
-            //Combine in "output" folder
-            string outputDir = root + @"\output";
-            Directory.CreateDirectory(outputDir);
-
-            foreach(ImageObject img in imageSetList[0].ImageList)
-            {
-                img.Process(null, "", 0, imageSetList.Count() - 1, imageSetList, outputDir);
+                Image i = ImageCombiner.CreateImage(list.ToList());
+                i.Save(root + @"\_output\" + index + ".png");
             }
         }
     }
